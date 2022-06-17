@@ -22,6 +22,7 @@ const (
 )
 
 var NoRowsAffectedError = errors.New("zero row affected")
+var CouldNotFindUserBalance = errors.New("could not find user balance")
 
 type r1WalletRepository struct {
 	db  *sql.DB
@@ -51,7 +52,7 @@ func (r1 *r1WalletRepository) GetBalanceByUserID(ID int) (int, error) {
 	}(r)
 
 	if r.Next() == false {
-		return 0, nil
+		return 0, CouldNotFindUserBalance
 	}
 
 	var b int
@@ -125,7 +126,7 @@ func (r1 *r1WalletRepository) InsertTransaction(ut models.UserTransactionModel) 
 	}
 
 	bu, err := trx.GetBalanceByUserID(ut.UserID)
-	if bu == 0 {
+	if err != nil {
 		ib := trx.InsertBalance(ut.UserID, ut.Amount)
 		if ib != nil {
 			println(ib)
