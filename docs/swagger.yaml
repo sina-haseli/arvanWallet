@@ -1,0 +1,25 @@
+info:
+  contact: {}
+paths:
+  /api/balance/:user_id:
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: user_id
+        in: path
+        name: user_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: HandleGetBalanceRequest
+      tags:
+      - HandleGetBalanceRequest
+swagger: "2.0"

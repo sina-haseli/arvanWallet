@@ -1,9 +1,8 @@
-CREATE TABLE user_transactions
+CREATE TABLE user_balance
 (
     id         serial    not null,
     user_id         INT       NOT NULL,
-    amount          INT       NOT NULL,
-    description     VARCHAR(150),
+    current_balance INT       NOT NULL,
     created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id)
 );
