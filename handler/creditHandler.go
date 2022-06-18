@@ -42,7 +42,7 @@ func (ch *CreditHandler) HandleIncreaseRequestFromChannel(requestChannel chan st
 // @Produce json
 // @Param user_id path string true "user_id"
 // @Success 200 {object} map[string]interface{}
-// @Router /api/balance/:user_id [get]
+// @Router /api/balance/{user_id} [get]
 func (ch *CreditHandler) HandleGetBalanceRequest() func(c echo.Context) error {
 	return func(c echo.Context) error {
 		i, err := strconv.Atoi(c.Param("user_id"))
