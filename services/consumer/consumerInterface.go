@@ -1,5 +1,7 @@
 package consumer
 
+import "context"
+
 type Consumer interface {
-	Consume(messages chan<- string, channelName string)
+	Consume(ctx context.Context, channelName string, bufSize int) chan string
 }

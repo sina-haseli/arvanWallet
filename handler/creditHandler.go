@@ -1,10 +1,10 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/labstack/echo/v4"
-	"strconv"
 	"wallet/models"
 	"wallet/services"
 )
@@ -28,7 +28,9 @@ func (ch *CreditHandler) HandleIncreaseRequestFromChannel(requestChannel chan st
 			fmt.Println("could not parse json:", err)
 		}
 
-		err = ch.service.Wallet.Increase(req.UserID, req.Amount, "Increase by something")
+		ctx := context.Background()
+
+		err = ch.service.Wallet.Increase(ctx, req.UserID, req.Amount, "Increase by something")
 		if err != nil {
 			fmt.Println("could not increase credit:", err)
 		}
@@ -45,17 +47,13 @@ func (ch *CreditHandler) HandleIncreaseRequestFromChannel(requestChannel chan st
 // @Router /api/balance/{user_id} [get]
 func (ch *CreditHandler) HandleGetBalanceRequest() func(c echo.Context) error {
 	return func(c echo.Context) error {
-		i, err := strconv.Atoi(c.Param("user_id"))
-		if err != nil {
-			return echo.ErrBadRequest
-		}
+		i := c.Param("user_id")
 
-		b, err := ch.service.Wallet.GetBalance(i)
+		b, err := ch.service.Wallet.GetBalance(c.Request().Context(), i)
 		if err != nil {
 			return echo.ErrInternalServerError
 		}
 
-		_ = c.JSON(200, map[string]interface{}{"balance": b})
-		return nil
+		return c.JSON(200, map[string]interface{}{"balance": b})
 	}
 }

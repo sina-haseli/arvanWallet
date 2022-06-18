@@ -1,6 +1,8 @@
 package wallet
 
+import "context"
+
 type Wallet interface {
-	GetBalance(userID int) (int, error)
-	Increase(userID int, amount int, description string) error
+	GetBalance(ctx context.Context, userID string) (int, error)
+	Increase(ctx context.Context, userID string, amount int, description string) error
 }

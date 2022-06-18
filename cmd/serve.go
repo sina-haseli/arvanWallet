@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"github.com/labstack/echo-contrib/prometheus"
 	"github.com/labstack/echo/v4"
 	"github.com/spf13/cobra"
@@ -42,7 +43,10 @@ func initializeHttpServer(handler *handler.BaseHandler, port string) {
 }
 
 func initializeStreamServer(service *services.Services, config *config.ConfiguredApp, handler *handler.BaseHandler) {
-	ch := make(chan string)
-	go service.Consumer.Consume(ch, config.Config.App.ComQueueName)
-	handler.Credit.HandleIncreaseRequestFromChannel(ch)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	eventCh := service.Consumer.Consume(ctx, config.Config.App.ComQueueName, 1000)
+
+	handler.Credit.HandleIncreaseRequestFromChannel(eventCh)
 }

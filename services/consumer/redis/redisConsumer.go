@@ -1,6 +1,7 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"wallet/repositories"
 )
@@ -15,14 +16,25 @@ func NewRedisConsumer(repository *repositories.Repository) *redisConsumer {
 	}
 }
 
-func (r *redisConsumer) Consume(messages chan<- string, channelName string) {
-	for {
-		ch, err := r.repository.Redis.Dequeue(channelName)
-		if err != nil {
-			fmt.Println("could not dequeue from redis", err)
-			continue
-		}
+func (r *redisConsumer) Consume(ctx context.Context, channelName string, bufSize int) chan string {
+	eventCh := make(chan string, bufSize)
 
-		messages <- ch
-	}
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				close(eventCh)
+				return
+			default:
+				ch, err := r.repository.Redis.Dequeue(channelName)
+				if err != nil {
+					fmt.Println("could not dequeue from redis", err)
+					continue
+				}
+				eventCh <- ch
+			}
+		}
+	}()
+
+	return eventCh
 }

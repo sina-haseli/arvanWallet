@@ -8,14 +8,8 @@ import (
 	"wallet/models"
 )
 
-type dbQE interface {
-	Query(query string, args ...interface{}) (*sql.Rows, error)
-	Exec(query string, args ...interface{}) (sql.Result, error)
-}
-
 const (
-	//getBalanceQuery        = "SELECT current_balance FROM user_transactions WHERE user_id = $1 ORDER BY id DESC LIMIT 1"
-	getBalanceQuery2       = "SELECT current_balance FROM user_balance WHERE user_id = $1 LIMIT 1"
+	getBalanceQuery        = "SELECT current_balance FROM user_balance WHERE user_id = $1 LIMIT 1"
 	insertBalanceQuery     = "INSERT INTO user_balance (user_id, current_balance) VALUES ($1, $2)"
 	updateBalanceQuery     = "UPDATE user_balance SET current_balance = $1 WHERE user_id = $2"
 	insertTransactionQuery = "INSERT INTO user_transactions (user_id, amount, description) VALUES ($1, $2, $3)"
@@ -25,21 +19,17 @@ var NoRowsAffectedError = errors.New("zero row affected")
 var CouldNotFindUserBalance = errors.New("could not find user balance")
 
 type r1WalletRepository struct {
-	db  *sql.DB
-	dbq dbQE
-	tx  *sql.Tx
+	db *sql.DB
 }
 
 func NewR1WalletRepository(db *sql.DB) *r1WalletRepository {
 	return &r1WalletRepository{
-		db:  db,
-		dbq: db,
-		tx:  nil,
+		db: db,
 	}
 }
 
-func (r1 *r1WalletRepository) GetBalanceByUserID(ID int) (int, error) {
-	r, err := r1.dbq.Query(getBalanceQuery2, ID)
+func (r1 *r1WalletRepository) getBalanceByUserID(ctx context.Context, tx *sql.Tx, ID string) (int, error) {
+	r, err := tx.QueryContext(ctx, getBalanceQuery, ID)
 	if err != nil {
 		return 0, err
 	}
@@ -64,9 +54,34 @@ func (r1 *r1WalletRepository) GetBalanceByUserID(ID int) (int, error) {
 	return b, nil
 }
 
-func (r1 *r1WalletRepository) InsertBalance(userID, currentBalance int) error {
-	println(userID, currentBalance)
-	r, err := r1.dbq.Exec(insertBalanceQuery, userID, currentBalance)
+func (r1 *r1WalletRepository) GetBalanceByUserID(ctx context.Context, ID string) (int, error) {
+	r, err := r1.db.QueryContext(ctx, getBalanceQuery, ID)
+	if err != nil {
+		return 0, err
+	}
+
+	defer func(r *sql.Rows) {
+		err := r.Close()
+		if err != nil {
+			fmt.Println("could not close rows")
+		}
+	}(r)
+
+	if r.Next() == false {
+		return 0, CouldNotFindUserBalance
+	}
+
+	var b int
+	err = r.Scan(&b)
+	if err != nil {
+		return 0, err
+	}
+
+	return b, nil
+}
+
+func (r1 *r1WalletRepository) InsertBalance(ctx context.Context, trx *sql.Tx, userID string, currentBalance int) error {
+	r, err := trx.ExecContext(ctx, insertBalanceQuery, userID, currentBalance)
 	if err != nil {
 		return err
 	}
@@ -83,8 +98,8 @@ func (r1 *r1WalletRepository) InsertBalance(userID, currentBalance int) error {
 	return nil
 }
 
-func (r1 *r1WalletRepository) UpdateBalance(currentBalance, userID int) error {
-	r, err := r1.dbq.Exec(updateBalanceQuery, currentBalance, userID)
+func (r1 *r1WalletRepository) UpdateBalance(ctx context.Context, trx *sql.Tx, currentBalance int, userID string) error {
+	r, err := trx.ExecContext(ctx, updateBalanceQuery, currentBalance, userID)
 	if err != nil {
 		return err
 	}
@@ -101,8 +116,8 @@ func (r1 *r1WalletRepository) UpdateBalance(currentBalance, userID int) error {
 	return nil
 }
 
-func (r1 *r1WalletRepository) Insert(ut models.UserTransactionModel) error {
-	r, err := r1.dbq.Exec(insertTransactionQuery, ut.UserID, ut.Amount, ut.Description)
+func (r1 *r1WalletRepository) Insert(ctx context.Context, trx *sql.Tx, ut models.UserTransactionModel) error {
+	r, err := trx.ExecContext(ctx, insertTransactionQuery, ut.UserID, ut.Amount, ut.Description)
 	if err != nil {
 		return err
 	}
@@ -119,68 +134,43 @@ func (r1 *r1WalletRepository) Insert(ut models.UserTransactionModel) error {
 	return nil
 }
 
-func (r1 *r1WalletRepository) InsertTransaction(ut models.UserTransactionModel) error {
-	trx, err := r1.beginTransaction()
+func (r1 *r1WalletRepository) InsertTransaction(ctx context.Context, ut models.UserTransactionModel) error {
+	trx, err := r1.db.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return err
 	}
 
-	bu, err := trx.GetBalanceByUserID(ut.UserID)
+	bu, err := r1.getBalanceByUserID(ctx, trx, ut.UserID)
 	if err != nil {
-		ib := trx.InsertBalance(ut.UserID, ut.Amount)
-		if ib != nil {
-			println(ib)
-			er := trx.rollbackTransaction()
-			if er != nil {
-				return er
+		if errors.Is(err, CouldNotFindUserBalance) {
+			if ibErr := r1.InsertBalance(ctx, trx, ut.UserID, ut.Amount); ibErr != nil {
+				if txErr := trx.Rollback(); txErr != nil {
+					return txErr
+				}
+				return ibErr
 			}
-			return ib
 		}
-	} else {
-		ub := trx.UpdateBalance(bu+ut.Amount, ut.UserID)
 
-		if ub != nil {
-			er := trx.rollbackTransaction()
-			if er != nil {
-				return er
-			}
-			return ub
+		if txErr := trx.Rollback(); txErr != nil {
+			return txErr
 		}
+
+		return err
 	}
 
-	r := trx.Insert(ut)
-	if r != nil {
-		er := trx.rollbackTransaction()
-		if er != nil {
-			return er
+	if ubErr := r1.UpdateBalance(ctx, trx, bu+ut.Amount, ut.UserID); ubErr != nil {
+		if txErr := trx.Rollback(); txErr != nil {
+			return txErr
 		}
-		return r
+		return ubErr
 	}
 
-	return trx.commitTransaction()
-}
-
-func (r1 *r1WalletRepository) beginTransaction() (*r1WalletRepository, error) {
-	tx, err := r1.db.BeginTx(context.Background(), &sql.TxOptions{})
-	if err != nil {
-		return &r1WalletRepository{}, err
+	if insertErr := r1.Insert(ctx, trx, ut); insertErr != nil {
+		if txErr := trx.Rollback(); txErr != nil {
+			return txErr
+		}
+		return insertErr
 	}
 
-	return &r1WalletRepository{tx: tx, dbq: tx}, nil
-}
-
-func (r1 *r1WalletRepository) commitTransaction() error {
-	if r1.tx == nil {
-		return fmt.Errorf("you cant commit tansaction befor start it")
-	}
-
-	return r1.tx.Commit()
-}
-
-func (r1 *r1WalletRepository) rollbackTransaction() error {
-	if r1.tx == nil {
-		return fmt.Errorf("you cant rollback tansaction befor start it")
-	}
-
-	return r1.tx.Rollback()
+	return trx.Commit()
 }

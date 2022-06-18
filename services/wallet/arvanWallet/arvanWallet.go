@@ -1,6 +1,7 @@
 package arvanWallet
 
 import (
+	"context"
 	"fmt"
 	"wallet/models"
 	"wallet/repositories"
@@ -16,8 +17,8 @@ func NewR1Wallet(repository *repositories.Repository) *R1Wallet {
 	}
 }
 
-func (r *R1Wallet) GetBalance(userID int) (int, error) {
-	b, err := r.repository.Wallet.GetBalanceByUserID(userID)
+func (r *R1Wallet) GetBalance(ctx context.Context, userID string) (int, error) {
+	b, err := r.repository.Wallet.GetBalanceByUserID(ctx, userID)
 	if err != nil {
 		return 0, err
 	}
@@ -25,12 +26,12 @@ func (r *R1Wallet) GetBalance(userID int) (int, error) {
 	return b, nil
 }
 
-func (r *R1Wallet) Increase(userID, amount int, description string) error {
+func (r *R1Wallet) Increase(ctx context.Context, userID string, amount int, description string) error {
 	if amount <= 0 {
 		return fmt.Errorf("negative amount")
 	}
 
-	err := r.repository.Wallet.InsertTransaction(models.UserTransactionModel{
+	err := r.repository.Wallet.InsertTransaction(ctx, models.UserTransactionModel{
 		UserID:      userID,
 		Amount:      amount,
 		Description: description,

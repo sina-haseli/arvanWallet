@@ -1,22 +1,21 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
 	"github.com/go-redis/redis/v7"
 	"wallet/models"
 )
 
 type Wallet interface {
-	GetBalanceByUserID(ID int) (int, error)
-	InsertTransaction(ut models.UserTransactionModel) error
+	GetBalanceByUserID(ctx context.Context, ID string) (int, error)
+	InsertTransaction(ctx context.Context, ut models.UserTransactionModel) error
 }
 
 type Redis interface {
 	Dequeue(queueName string) (string, error)
 	Enqueue(message []byte, queueName string) error
 	Increase(key string) error
-	SetValue(key string, value interface{}) error
-	GetValue(key string) (string, error)
 }
 
 type Repository struct {

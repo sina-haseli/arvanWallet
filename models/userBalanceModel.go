@@ -1,6 +1,6 @@
 package models
 
 type UserBalanceModel struct {
-	UserID         int
+	UserID         string
 	CurrentBalance int
 }

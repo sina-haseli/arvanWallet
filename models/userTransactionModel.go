@@ -1,7 +1,7 @@
 package models
 
 type UserTransactionModel struct {
-	UserID      int
+	UserID      string
 	Amount      int
 	Description string
 }
