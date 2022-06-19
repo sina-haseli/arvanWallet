@@ -150,12 +150,6 @@ func (r1 *r1WalletRepository) InsertTransaction(ctx context.Context, ut models.U
 				return ibErr
 			}
 		}
-
-		if txErr := trx.Rollback(); txErr != nil {
-			return txErr
-		}
-
-		return err
 	}
 
 	if ubErr := r1.UpdateBalance(ctx, trx, bu+ut.Amount, ut.UserID); ubErr != nil {
