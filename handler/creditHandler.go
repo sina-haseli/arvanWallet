@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/labstack/echo/v4"
+	"net/http"
 	"wallet/models"
 	"wallet/services"
 )
@@ -51,7 +52,7 @@ func (ch *CreditHandler) HandleGetBalanceRequest() func(c echo.Context) error {
 
 		b, err := ch.service.Wallet.GetBalance(c.Request().Context(), i)
 		if err != nil {
-			return echo.ErrInternalServerError
+			return c.JSON(http.StatusNotFound, map[string]interface{}{"message": "You don't have any credit"})
 		}
 
 		return c.JSON(200, map[string]interface{}{"balance": b})
